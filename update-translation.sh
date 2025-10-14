@@ -40,12 +40,32 @@ GIT_TAG="v$INSTALLED_VERSION"
 # 3. 前往 Git 仓库目录
 cd "$REPO_PATH"
 echo "🔄 正在进入仓库目录: $REPO_PATH"
+# Try to refresh tags from remote (ignore failures to keep script robust)
+git fetch --tags --quiet > /dev/null 2>&1 || true
 
-# 4. 检查对应的 Git 标签是否存在
+# 4. 检查对应的 Git 标签是否存在；若无精确匹配，寻找“最接近”的标签
 if ! git tag --list | grep -q "^$GIT_TAG$"; then
-    printf "${RED}错误：在本地 Git 仓库中未找到标签 ${GIT_TAG}。${NC}\n"
-    printf "${YELLOW}请确保您已经为版本 ${INSTALLED_VERSION} 创建了对应的汉化并打了标签。${NC}\n"
-    exit 1
+    # Fallback to closest within the same major.minor (e.g., 1.7.1 -> v1.7*)
+    MAJOR=$(echo "$INSTALLED_VERSION" | cut -d. -f1)
+    MINOR=$(echo "$INSTALLED_VERSION" | cut -d. -f2)
+    if [ -n "$MINOR" ]; then
+        BASE="${MAJOR}.${MINOR}"
+    else
+        BASE="${MAJOR}"
+    fi
+
+    # Candidates: v<BASE> or v<BASE>.<patch...>
+    CANDIDATES=$(git tag --list | grep -E "^v${BASE//./\\.}(\\.|$)" || true)
+
+    if [ -n "$CANDIDATES" ]; then
+        BEST_VERSION=$(echo "$CANDIDATES" | sed 's/^v//' | sort -V | tail -n 1)
+        GIT_TAG="v$BEST_VERSION"
+        printf "${YELLOW}⚠️ 未找到精确标签 v%s，使用最接近的标签 %s。${NC}\n" "$INSTALLED_VERSION" "$GIT_TAG"
+    else
+        printf "${RED}错误：在本地 Git 仓库中未找到标签 ${GIT_TAG}，也未找到同一主次版本的标签。${NC}\n"
+        printf "${YELLOW}请确保您已经为版本 ${INSTALLED_VERSION} 创建了对应的汉化并打了标签。${NC}\n"
+        exit 1
+    fi
 fi
 echo "✅ 已在 Git 仓库中找到标签 ${GIT_TAG}。"
 
