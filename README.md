@@ -22,7 +22,8 @@ Small local tools for patching and translating `Commander One.app`.
 ## Usage
 
 ```bash
-cd ~/Projects/Personal/commander-one-patcher
+git clone https://github.com/binbinsh/commander-one-patcher.git
+cd commander-one-patcher
 
 ./patch-commander-one.py --sanitize-prefs --clear-saved-state
 bash ./update-translation.sh
